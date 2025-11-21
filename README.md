@@ -44,7 +44,7 @@ Currently hosted here: https://bigfish.free.nf/
 
 ### 🎨 Multiple Themes
 
-- **Light Mode**: Modern, clean interface
+- **Light Mode**: Modern, clean interface for Mesi and Mao
 - **Dark Mode**: Eye-friendly for late-night grinding
 - **Ragnarok 2005**: Nostalgic RMS forum-style theme that recreates the classic forum aesthetic
 
