@@ -545,11 +545,11 @@
                          x-show="currentTheme !== 'rms'"
                          :class="{'bg-white border-slate-200 hover:border-red-500': currentTheme === 'light', 'bg-black border-slate-800 hover:border-red-500': currentTheme === 'dark'}">
                         
-                        <!-- MVP Sprite from RateMyServer (z-10) -->
-                        <img :src="`https://file5s.ratemyserver.net/mobs/${mvp.id}.gif`" 
+                        <!-- MVP Sprite from iRO Wiki (z-10) -->
+                        <img :src="`https://db.irowiki.org/image/monster/${mvp.id}.png`" 
                              :alt="mvp.name"
                              class="pixelated absolute z-10"
-                             style="image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges; max-height: 68px; left: 78%; top: 45%; transform: translate(-50%, -50%) scale(2.5);"
+                             style="image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges; max-height: 68px; left: 70%; top: 45%; transform: translate(-50%, -50%) scale(2.5);"
                              @error="$event.target.style.display='none'">
                         
                         <!-- Gradient overlay (z-20) - higher gradient -->
@@ -952,11 +952,11 @@
                     { id: 1150, name: 'Moonlight Flower', map: 'pay_dun04', status: 'alive', respawnTime: 'Now', coords: '(120, 115)' },
                     { id: 1159, name: 'Phreeoni', map: 'moc_fild17', status: 'dead', respawnTime: '45 min', coords: 'Random' },
                     { id: 1511, name: 'Amon Ra', map: 'moc_pryd06', status: 'alive', respawnTime: 'Now', coords: '(102, 85)' },
-                    { id: 1785, name: 'Atroce', map: 'ra_fild02', status: 'dead', respawnTime: '3h 15m', coords: 'Random' },
-                    { id: 1272, name: 'Dark Lord', map: 'gl_chyard', status: 'alive', respawnTime: 'Now', coords: 'Random' },
-                    { id: 1115, name: 'Eddga', map: 'pay_fild11', status: 'dead', respawnTime: '1h 50m', coords: 'Random' },
-                    { id: 1038, name: 'Osiris', map: 'moc_pryd04', status: 'alive', respawnTime: 'Now', coords: 'Random' },
-                    { id: 1583, name: 'Tao Gunka', map: 'beach_dun', status: 'dead', respawnTime: '4h 30m', coords: 'Random' },
+                    { id: 1389, name: 'Dracula', map: 'gef_dun01', status: 'dead', respawnTime: '30 min', coords: 'Random' },
+                    { id: 1115, name: 'Eddga', map: 'pay_fild11', status: 'alive', respawnTime: 'Now', coords: 'Random' },
+                    { id: 1112, name: 'Drake', map: 'treasure02', status: 'dead', respawnTime: '1h 10m', coords: '(101, 151)' },
+                    { id: 1157, name: 'Pharaoh', map: 'in_sphinx5', status: 'alive', respawnTime: 'Now', coords: 'Random' },
+                    { id: 1312, name: 'Turtle General', map: 'tur_dun04', status: 'dead', respawnTime: '52 min', coords: '(99, 93)' },
                 ],
                 events: [
                     { 
