@@ -521,6 +521,11 @@
                             @click="untrackAll()">
                         <i class="fa-solid fa-trash-can mr-2"></i> Untrack All
                     </button>
+                    <button class="text-white px-4 py-2 rounded-lg text-sm font-medium shadow-md transition-colors"
+                            :class="{'bg-slate-600 hover:bg-slate-700': currentTheme !== 'rms', 'bg-[#000000] text-[#FFFF00]': currentTheme === 'mesi'}"
+                            @click="openShareDialog()">
+                        <i class="fa-solid fa-share-nodes mr-2"></i> Share
+                    </button>
                 </div>
             </div>
             
@@ -753,6 +758,53 @@
                 </div>
             </div>
 
+            <!-- Share dialog modal -->
+            <div x-show="shareDialog.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+                <div class="absolute inset-0 bg-black/50 z-40" @click.self="closeShareDialog()"></div>
+                <div class="bg-white dark:bg-guild-800 rounded-lg p-6 z-50 max-w-lg w-full" :class="getCardClass()" @click.stop>
+                    <h4 class="text-lg font-bold mb-3" :class="getTextClass()">Shared MVPs</h4>
+                    <div class="text-sm mb-3" :class="getSubTextClass()">
+                        <template x-if="shareDialog.shared && shareDialog.shared.data && shareDialog.shared.data.length === 0">
+                            <div>No MVPs were shared.</div>
+                        </template>
+                        <template x-if="shareDialog.shared && shareDialog.shared.data && shareDialog.shared.data.length > 0">
+                            <div class="space-y-2 max-h-48 overflow-y-auto mb-3">
+                                <template x-for="(s, i) in shareDialog.shared.data" :key="`shared-${i}-${s.id}`">
+                                    <div class="flex justify-between items-center p-2 border rounded" :class="getCardClass()">
+                                        <div>
+                                            <div class="font-semibold" x-text="s.name || ('MVP ' + s.id)"></div>
+                                            <div class="text-xs" :class="getSubTextClass()">ID: <span x-text="s.id"></span> — Map: <span x-text="s.map || 'unknown'"></span></div>
+                                        </div>
+                                        <div class="text-xs text-right">
+                                            <div x-text="s.status || ''"></div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="mb-3">
+                        <input class="w-full px-3 py-2 rounded border text-xs bg-white dark:bg-guild-800 text-black dark:text-white border-slate-300 dark:border-guild-700" type="text" readonly x-bind:value="shareDialog.shareLink" />
+                        <div class="flex items-center justify-between mt-2">
+                            <div class="text-xs text-slate-500" :class="getSubTextClass()">Anyone with this link can view and import the shared MVPs into their tracker.</div>
+                            <div class="text-xs" :class="getSubTextClass()">
+                                <label class="inline-flex items-center gap-2">
+                                    <input type="checkbox" x-model="shareDialog.autoImport" @change="regenerateShareLink()" />
+                                    <span>Auto-import on open</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="text-xs text-slate-400 mt-1" :class="getSubTextClass()">Opening the link previews the shared MVPs — click Import to merge into your local tracker. Auto-import will import automatically when a recipient opens the link.</div>
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <button class="px-3 py-1" @click="closeShareDialog()">Close</button>
+                        <button class="px-3 py-1" @click="copyShareLink()">Copy Link</button>
+                        <button class="px-3 py-1" @click="regenerateShareLink()">Regenerate Link</button>
+                        <button class="px-3 py-1 btn-primary" @click="importShared()">Import</button>
+                    </div>
+                </div>
+            </div>
+
                 <!-- Toasts -->
                 <div class="fixed top-[60px] left-1/2 transform -translate-x-1/2 space-y-2 w-full max-w-md px-4" style="z-index:9999;" aria-live="polite">
                     <template x-for="t in toasts" :key="t.id">
@@ -961,6 +1013,8 @@
                     this.buildAllMvps();
                     // Load persisted active trackers from localStorage
                     this.loadActiveMvps();
+                    // If page contains a shared tracker in the URL, load it into the share dialog
+                    this.loadSharedFromUrl();
                     
                     // Clock
                     this.updateTime();
@@ -1231,6 +1285,8 @@
                 mvpSortBy: 'name',
                 mvpSortDir: 'asc',
                 spawnSelection: { open: false, mvpId: null, mvpName: '', choices: [], markAsDead: false },
+                // Share dialog state for sharing/importing tracked MVPs via a URL
+                shareDialog: { open: false, shared: null, shareLink: '', copied: false, autoImport: false },
                 // UI helpers
                 toasts: [],
                 confirmDialog: { open: false, title: '', message: '', onConfirm: null },
@@ -1426,6 +1482,143 @@
                         }
                     } catch (e) {
                         console.warn('Failed loading activeMvps', e);
+                    }
+                },
+
+                // Share helpers: encode/decode to/from URL-safe base64
+                encodeState(obj) {
+                    try {
+                        const json = JSON.stringify(obj);
+                        // Properly handle Unicode
+                        const utf8 = unescape(encodeURIComponent(json));
+                        return encodeURIComponent(btoa(utf8));
+                    } catch (e) { return null; }
+                },
+                decodeState(s) {
+                    try {
+                        const decoded = decodeURIComponent(s);
+                        const json = decodeURIComponent(escape(atob(decoded)));
+                        return JSON.parse(json);
+                    } catch (e) {
+                        try {
+                            // Fallback for older encodings
+                            const json2 = atob(s);
+                            return JSON.parse(json2);
+                        } catch (e2) { return null; }
+                    }
+                },
+
+                // Open the share dialog and prepare a shareable link
+                openShareDialog() {
+                    try {
+                        const minimal = (this.activeMvps || []).map(a => ({ id: a.id, name: a.name, map: a.map, status: a.status, killedAt: a.killedAt || null, minTarget: a.minTarget || null, maxTarget: a.maxTarget || null }));
+                        // include autoImport flag if the user has toggled it
+                        const payload = { v: 1, data: minimal, ts: Date.now(), autoImport: !!this.shareDialog.autoImport };
+                        const enc = this.encodeState(payload);
+                        if (!enc) {
+                            this.showToast('Failed to generate share link', 'warning');
+                            return;
+                        }
+                        const url = `${location.origin}${location.pathname}#shared=${enc}`;
+                        this.shareDialog.open = true;
+                        this.shareDialog.shared = payload;
+                        this.shareDialog.shareLink = url;
+                        this.shareDialog.copied = false;
+                    } catch (e) {
+                        console.warn('openShareDialog failed', e);
+                        this.showToast('Failed to prepare share data', 'warning');
+                    }
+                },
+
+                // Re-encode the currently prepared shared payload (useful after toggling autoImport)
+                regenerateShareLink() {
+                    try {
+                        if (!this.shareDialog.shared) {
+                            // openShareDialog will create shared; call it
+                            this.openShareDialog();
+                            return;
+                        }
+                        // update flag
+                        this.shareDialog.shared.autoImport = !!this.shareDialog.autoImport;
+                        const enc = this.encodeState(this.shareDialog.shared);
+                        if (!enc) return;
+                        this.shareDialog.shareLink = `${location.origin}${location.pathname}#shared=${enc}`;
+                        this.shareDialog.copied = false;
+                    } catch (e) {
+                        console.warn('regenerateShareLink failed', e);
+                    }
+                },
+
+                copyShareLink() {
+                    try {
+                        const el = document.createElement('textarea');
+                        el.value = this.shareDialog.shareLink || '';
+                        document.body.appendChild(el);
+                        el.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(el);
+                        this.shareDialog.copied = true;
+                        this.showToast('Share link copied to clipboard', 'success');
+                    } catch (e) {
+                        console.warn('copyShareLink failed', e);
+                        this.showToast('Copy failed — select and copy manually', 'warning');
+                    }
+                },
+
+                // Import the shared MVPs into the user's tracker (merge, avoid duplicates)
+                importShared() {
+                    try {
+                        if (!this.shareDialog.shared || !Array.isArray(this.shareDialog.shared.data)) return;
+                        const incoming = this.shareDialog.shared.data;
+                        incoming.forEach(it => {
+                            // Avoid duplicates by id+map
+                            const exists = this.activeMvps.some(a => a.id === it.id && a.map === it.map);
+                            if (!exists) {
+                                const item = { id: it.id, name: it.name || this.mvpDatabase[it.id]?.name || ('MVP ' + it.id), map: it.map || 'unknown', status: it.status || 'dead', respawnTime: it.status === 'dead' ? 'Calculating...' : 'Now', killedAt: it.killedAt || null, minTarget: it.minTarget || null, maxTarget: it.maxTarget || null };
+                                // If this was shared as dead, compute phase values will be handled by ticker
+                                this.activeMvps.push(item);
+                            }
+                        });
+                        this.saveActiveMvps();
+                        this.showToast('Imported shared MVPs', 'success');
+                        this.shareDialog.open = false;
+                    } catch (e) {
+                        console.warn('importShared failed', e);
+                        this.showToast('Import failed', 'warning');
+                    }
+                },
+
+                closeShareDialog() { this.shareDialog.open = false; },
+
+                // If the URL contains a shared payload in the hash (#shared=<enc>), decode and open dialog
+                loadSharedFromUrl() {
+                    try {
+                        const h = (location.hash || '').replace(/^#/, '');
+                        if (!h) return;
+                        const m = h.match(/^shared=(.+)$/);
+                        if (!m) return;
+                        const enc = m[1];
+                        const payload = this.decodeState(enc);
+                        if (!payload || !payload.data) return;
+                        this.shareDialog.open = true;
+                        this.shareDialog.shared = payload;
+                        // Build a shareLink for convenience (preserve current URL)
+                        this.shareDialog.shareLink = `${location.origin}${location.pathname}#shared=${enc}`;
+                        // If payload requests autoImport, import immediately (useful for direct links)
+                        if (payload.autoImport) {
+                            // ensure UI flag is consistent
+                            this.shareDialog.autoImport = true;
+                            // Give the UI a short moment to render then import
+                            setTimeout(() => {
+                                try { this.importShared(); } catch (e) { console.warn('auto import failed', e); }
+                            }, 20);
+                            // remove the hash so reloads don't re-import
+                            try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+                            return;
+                        }
+                        // Do not automatically import — let user review and import
+                    } catch (e) {
+                        console.warn('loadSharedFromUrl failed', e);
                     }
                 },
 
